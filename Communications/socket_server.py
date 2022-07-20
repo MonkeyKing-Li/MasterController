@@ -14,6 +14,7 @@ class SocketServer:
         self.conn_pool = []
         self.vr_is_ready = False
         self.dq_is_ready = False
+        self.da_is_ready = False
         self.socket_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 创建 socket 对象
         self.socket_server.bind(self.ADDRESS)
         self.socket_server.listen(5)  # 最大等待数（有很多人理解为最大连接数，其实是错误的）
@@ -80,6 +81,20 @@ class SocketServer:
                 self.conn_pool[1].sendall("res_left".encode(encoding='utf8'))
             elif message.decode(encoding='utf8') == "RIGHT":
                 self.conn_pool[1].sendall("res_right".encode(encoding='utf8'))
+
+            # Following Messages may Come From Data Acquisition.
+            # TODO: Need to Rearrange Connection pool.
+            if message.decode(encoding='utf8') == "da is ready":
+                self.da_is_ready = True
+                self.conn_pool[0].sendall(str(time.time()).encode(encoding='utf8'))
+            elif message.decode(encoding='utf8') == "ins_show_settings":
+                print("Here is an UI for experiment settings!")
+            elif "inf_name" in message.decode(encoding='utf8'):
+                subject_name = message.decode(encoding='utf8')[9:]
+                print("Subject Name is " + subject_name)
+            elif "inf_id" in message.decode(encoding='utf8'):
+                subject_id = message.decode(encoding='utf8')[7:]
+                print("Subject ID is " + subject_id)
 
             if message.decode(encoding='utf8') == "Quit":
                 client.close()
