@@ -8,4 +8,6 @@ if __name__ == '__main__':
     thread.setDaemon(True)
     thread.start()
     while True:
+        if socket_server.client_quit_number == 2:
+            break
         pass

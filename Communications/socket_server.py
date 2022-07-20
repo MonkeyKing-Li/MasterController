@@ -13,9 +13,19 @@ class SocketServer:
         self.socket_server = None
         self.conn_pool = []
         self.vr_is_ready = False
+        self.dq_is_ready = False
         self.socket_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 创建 socket 对象
         self.socket_server.bind(self.ADDRESS)
         self.socket_server.listen(5)  # 最大等待数（有很多人理解为最大连接数，其实是错误的）
+        self.client_quit_number = 0
+
+        self.SUBJECT_ID = '0001'
+        self.SUBJECT_NAME = 'David'
+        self.TRAIN_TIMES = '40'
+        self.TEST_SCENE = 'scene1'
+        self.TEST_TIMES = '20'
+        self.MODE = 'TrainTest'
+
         print("服务端已启动，等待客户端连接...")
 
     def accept_client(self):
@@ -40,19 +50,41 @@ class SocketServer:
         while True:
             message = client.recv(1024)
             print("客户端消息:", message.decode())
+            # Following Messages may Come From Unity Virtual Scene.
             if message.decode(encoding='utf8') == "vr is on":
-                client.sendall("set_name-Bob".encode(encoding='utf8'))
+                client.sendall(("set_name-" + self.SUBJECT_NAME).encode(encoding='utf8'))
                 time.sleep(0.1)
-                client.sendall("set_times-20".encode(encoding='utf8'))
+                client.sendall(("set_train_times-" + self.TRAIN_TIMES).encode(encoding='utf8'))
                 time.sleep(0.1)
-                client.sendall("set_scene-scene1".encode(encoding='utf8'))
+                client.sendall(("set_test_times-" + self.TEST_TIMES).encode(encoding='utf8'))
                 time.sleep(0.1)
-                client.sendall("set_mode-both".encode(encoding='utf8'))
+                client.sendall(("set_scene-" + self.TEST_SCENE).encode(encoding='utf8'))
+                time.sleep(0.1)
+                client.sendall(("set_mode-" + self.MODE).encode(encoding='utf8'))
             elif message.decode(encoding='utf8') == "vr is ready":
                 self.vr_is_ready = True
+            if message.decode(encoding='utf8') == "LEFTINS":
+                self.conn_pool[0].sendall("LEFTINS".encode(encoding='utf8'))
+            elif message.decode(encoding='utf8') == "RIGHTINS":
+                self.conn_pool[0].sendall("RIGHTINS".encode(encoding='utf8'))
+            elif message.decode(encoding='utf8') == "ENDING":
+                self.conn_pool[0].sendall("ENDING".encode(encoding='utf8'))
+
+            # Following Messages may Come From Data Processor.
+            if message.decode(encoding='utf8') == "dq is ready":
+                self.dq_is_ready = True
+                self.conn_pool[0].sendall(("Subject_ID-"+self.SUBJECT_ID).encode(encoding='utf8'))
+                time.sleep(0.1)
+                self.conn_pool[0].sendall(("Mode-"+self.MODE).encode(encoding='utf8'))
+            elif message.decode(encoding='utf8') == "LEFT":
+                self.conn_pool[1].sendall("res_left".encode(encoding='utf8'))
+            elif message.decode(encoding='utf8') == "RIGHT":
+                self.conn_pool[1].sendall("res_right".encode(encoding='utf8'))
+
             if message.decode(encoding='utf8') == "Quit":
                 client.close()
                 # 删除连接
                 self.conn_pool.remove(client)
                 print("有一个客户端下线了。")
+                self.client_quit_number = self.client_quit_number + 1
                 break
