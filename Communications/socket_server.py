@@ -1,6 +1,10 @@
 import socket
 from threading import Thread
 import time
+import sys
+from settings_ui import dialog
+from PyQt5 import QtWidgets
+from multiprocessing import Process
 
 
 class SocketServer:
@@ -42,6 +46,12 @@ class SocketServer:
             # 设置成守护线程
             client_thread.setDaemon(True)
             client_thread.start()
+
+    def show_settings_ui(self):
+        app = QtWidgets.QApplication(sys.argv)
+        v = dialog.MontageSetDialog()
+        v.show()
+        sys.exit(app.exec_())
 
     def message_handle(self, client):
         """
@@ -89,6 +99,8 @@ class SocketServer:
                 self.conn_pool[0].sendall(str(time.time()).encode(encoding='utf8'))
             elif message.decode(encoding='utf8') == "ins_show_settings":
                 print("Here is an UI for experiment settings!")
+                p = Process(target=self.show_settings_ui)
+                p.start()
             elif "inf_name" in message.decode(encoding='utf8'):
                 subject_name = message.decode(encoding='utf8')[9:]
                 print("Subject Name is " + subject_name)
