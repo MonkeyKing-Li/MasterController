@@ -4,7 +4,10 @@ import time
 import sys
 from settings_ui import dialog
 from PyQt5 import QtWidgets
+from PyQt5 import QtCore
 from multiprocessing import Process
+from settings_ui.tools import StoppableProcess
+import os
 
 
 class SocketServer:
@@ -30,6 +33,9 @@ class SocketServer:
         self.TEST_SCENE = 'scene1'
         self.TEST_TIMES = '20'
         self.MODE = 'TrainTest'
+        self.MODEL_EXIST = False
+
+        self.p = None
 
         print("服务端已启动，等待客户端连接...")
 
@@ -47,18 +53,13 @@ class SocketServer:
             client_thread.setDaemon(True)
             client_thread.start()
 
-    def show_settings_ui(self):
-        app = QtWidgets.QApplication(sys.argv)
-        v = dialog.MontageSetDialog()
-        v.show()
-        sys.exit(app.exec_())
-
     def message_handle(self, client):
         """
         消息处理
         """
         client.sendall("Hi!".encode(encoding='utf8'))
         while True:
+            print(type(self.p))
             message = client.recv(1024)
             print("客户端消息:", message.decode())
             # Following Messages may Come From Unity Virtual Scene.
@@ -98,15 +99,28 @@ class SocketServer:
                 self.da_is_ready = True
                 self.conn_pool[0].sendall(str(time.time()).encode(encoding='utf8'))
             elif message.decode(encoding='utf8') == "ins_show_settings":
-                print("Here is an UI for experiment settings!")
-                p = Process(target=self.show_settings_ui)
-                p.start()
+                # print("Here is an UI for experiment settings!")
+                self.p = SettingsUI(model_exist=self.MODEL_EXIST)
+                self.p.start()
             elif "inf_name" in message.decode(encoding='utf8'):
                 subject_name = message.decode(encoding='utf8')[9:]
-                print("Subject Name is " + subject_name)
+                self.SUBJECT_NAME = subject_name
+                # print("Subject Name is " + subject_name)
             elif "inf_id" in message.decode(encoding='utf8'):
                 subject_id = message.decode(encoding='utf8')[7:]
-                print("Subject ID is " + subject_id)
+                self.SUBJECT_ID = subject_id
+                file_lis = os.listdir('D:/Software_Work/DataProcessor/processor/main')
+                if file_lis.__contains__(subject_id+'.pkl'):
+                    self.MODEL_EXIST = True
+                # print("Subject ID is " + subject_id)
+            elif message.decode(encoding='utf8') == "debug_showme":
+                print(self.TRAIN_TIMES, self.TEST_SCENE, self.TEST_TIMES, self.MODEL_EXIST, self.MODE)
+            if self.p is not None:
+                print("&&&&&&&&")
+                if self.p.v is not None:
+                    print("^^^^^^")
+                    if self.p.v.settingsFinishedFlag.value == 1:
+                        print('YEAHHHHHHHHHHHHHHHH!!!!')
 
             if message.decode(encoding='utf8') == "Quit":
                 client.close()
@@ -115,3 +129,21 @@ class SocketServer:
                 print("有一个客户端下线了。")
                 self.client_quit_number = self.client_quit_number + 1
                 break
+
+
+class SettingsUI(StoppableProcess):
+    def __init__(self, model_exist):
+        super().__init__()
+        self.model_exist = model_exist
+        self.v = None
+
+    def run(self):
+        app = QtWidgets.QApplication(sys.argv)
+        self.v = dialog.MontageSetDialog(model_exist=self.model_exist)
+        # print(self.v)
+        # Let Window Show at The Very Front.
+        self.v.activateWindow()
+        self.v.setWindowState(self.v.windowState() & ~QtCore.Qt.WindowMinimized | QtCore.Qt.WindowActive)
+        self.v.showNormal()
+        # self.v.show()
+        sys.exit(app.exec_())
